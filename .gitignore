@@ -1,0 +1,30 @@
+# Directorios de dependencias
+node_modules/
+packages/
+
+# Archivos de compilación
+*.class
+*.o
+*.pyc
+
+# Archivos temporales
+.env
+venv/
+
+# Archivos temporales
+*.tmp
+*~
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de configuración de IDE
+.idea/
+.vscode/
+
+# Archivos de log
+*.log
+
+# Archivos de caché
+*.cache
