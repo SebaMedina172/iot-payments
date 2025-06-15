@@ -1,18 +1,21 @@
 import sqlite3
 import threading
 import time
-from datetime import datetime
 
-# Base de datos 
-DATABASE_FILE = "transactions.db"
-db_lock = threading.Lock()
+# Ruta del archivo de base de datos SQLite
+DB_PATH = "transactions.db"
 
-def setup_database():
-    """Inicialia la BD - crea la tabla si no existe"""
-    with db_lock:
-        connection = sqlite3.connect(DATABASE_FILE)
-        c = connection.cursor()
-        c.execute("""
+# Lock para asegurar acceso thread-safe a la base de datos
+_lock = threading.Lock()
+
+def init_db():
+    """
+    Inicializa la base de datos creando la tabla 'transactions' si no existe
+    """
+    with _lock:  # Asegura acceso exclusivo durante la inicialización
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
         CREATE TABLE IF NOT EXISTS transactions (
             id TEXT PRIMARY KEY,
             amount REAL,
@@ -20,67 +23,75 @@ def setup_database():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
         """)
-        connection.commit()
-        connection.close()
+        conn.commit()
+        conn.close()
 
-def add_new_transaction(transaction_id: str, money_amount: float):
-    """Genera nueva transacción como pendiente (si todavia no existe)"""
-    with db_lock:
-        connection = sqlite3.connect(DATABASE_FILE)
-        c = connection.cursor()
-        c.execute(
+def save_transaction(txn_id: str, amount: float):
+    """
+    Guarda una nueva transacción en la base de datos con estado 'pending'
+    """
+    with _lock:  # Protege la operación de escritura
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
             "INSERT OR IGNORE INTO transactions (id, amount, status) VALUES (?, ?, ?)",
-            (transaction_id, money_amount, "pending")
+            (txn_id, amount, "pending")
         )
-        connection.commit()
-        connection.close()
+        conn.commit()
+        conn.close()
 
-def change_transaction_status(transaction_id: str, new_status: str):
-    """Cambia el estado de una transacción que ya existe"""
-    with db_lock:
-        connection = sqlite3.connect(DATABASE_FILE)
-        c = connection.cursor()
-        c.execute(
+def update_status(txn_id: str, status: str):
+    """
+    Actualiza el estado de una transacción existente
+    """
+    with _lock:  # Protege la operación de actualización
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
             "UPDATE transactions SET status = ? WHERE id = ?",
-            (new_status, transaction_id)
+            (status, txn_id)
         )
-        connection.commit()
-        connection.close()
+        conn.commit()
+        conn.close()
 
-def handle_transaction_workflow(transaction_id: str, money_amount: float) -> str:
+def process_logic_and_update(txn_id: str, amount: float) -> str:
     """
-    Lógica principal: si es menos de 100 se aprueba, 
-    sino se rechaza. Primero la guarda como pendiente y después actualiza.
+    Procesa una transacción aplicando lógica y actualizando su estado
     """
-    add_new_transaction(transaction_id, money_amount)
+    # Paso 1: Guardar transacción como 'pending'
+    save_transaction(txn_id, amount)
     
-    # Delay para simular procesamiento
+    # Paso 2: Simular tiempo de procesamiento
     time.sleep(0.2)
     
-    # Lógica simple: menos de 100 = ok, más = no
-    final_status = "approved" if money_amount < 100 else "rejected"
-    change_transaction_status(transaction_id, final_status)
+    # Paso 3: Aplicar lógica de negocio simple
+    status = "approved" if amount < 100 else "rejected"
     
-    return final_status
+    # Paso 4: Actualizar estado final
+    update_status(txn_id, status)
+    
+    return status
 
-def get_all_transactions():
-    """Trae todas las transacciones, las más nuevas primero"""
-    with db_lock:
-        connection = sqlite3.connect(DATABASE_FILE)
-        c = connection.cursor()
-        c.execute("SELECT id, amount, status, timestamp FROM transactions ORDER BY timestamp DESC")
-        all_rows = c.fetchall()
-        connection.close()
+def list_transactions():
+    """
+    Obtiene todas las transacciones ordenadas por fecha (más recientes primero)
+    """
+    with _lock:  # Protege la operación de lectura
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        # Ordenar por timestamp DESC para mostrar las más recientes primero
+        cursor.execute("SELECT id, amount, status, timestamp FROM transactions ORDER BY timestamp DESC")
+        rows = cursor.fetchall()
+        conn.close()
     
-    # Armamos una lista más fácil 
-    transactions_list = []
-    for row in all_rows:
-        # row[3] tiene el timestamp como string tipo '2025-06-14 18:00:00'
-        transactions_list.append({
-            "id": row[0],
-            "amount": row[1],
-            "status": row[2],
-            "timestamp": row[3]
+    # Convertir tuplas de SQLite a diccionarios para facilitar el uso
+    result = []
+    for r in rows:
+        result.append({
+            "id": r[0],
+            "amount": r[1],
+            "status": r[2],
+            "timestamp": r[3]
         })
     
-    return transactions_list
+    return result

@@ -1,7 +1,7 @@
 import os
 import json
 import paho.mqtt.client as mqtt
-from models import handle_transaction_workflow
+from models import process_logic_and_update
 
 # Configuración del broker - si no está en las variables de entorno usa localhost
 MQTT_HOST = os.getenv("MQTT_BROKER", "localhost")
@@ -34,7 +34,7 @@ def when_message_arrives(client, userdata, message):
     print(f"[MQTT] Nueva transacción: {transaction_id} por ${money_amount}")
     
     # Procesar la transacción
-    final_status = handle_transaction_workflow(transaction_id, money_amount)
+    final_status = process_logic_and_update(transaction_id, money_amount)
     
     # Mandamos respuesta de vuelta
     response_data = {"id": transaction_id, "status": final_status}
