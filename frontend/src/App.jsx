@@ -2,16 +2,13 @@
 
 import { useEffect, useState } from "react"
 
-const API_URL = import.meta.env.VITE_API_URL
-
-console.log("API_URL:", API_URL) // Debug temporal
-console.log("All env vars:", import.meta.env) // Debug temporal
-
 function App() {
   const [txns, setTxns] = useState([])
   const [error, setError] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [apiUrl, setApiUrl] = useState(null) // Nueva state para API URL
+  const [configLoading, setConfigLoading] = useState(true) // Loading para config
   const itemsPerPage = 15
 
   // Nuevos estados:
@@ -21,9 +18,27 @@ function App() {
   const [loadingClear, setLoadingClear] = useState(false)
   const [showControls, setShowControls] = useState(false)
 
-  const fetchTxns = async () => {
+  // Función para obtener la configuración
+  const fetchConfig = async () => {
     try {
-      const res = await fetch(`${API_URL}/transactions`)
+      const res = await fetch("/api/config")
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const config = await res.json()
+      setApiUrl(config.apiUrl)
+      console.log("API URL obtenida:", config.apiUrl) // Debug
+    } catch (e) {
+      console.error("Error obteniendo config:", e)
+      setError("Error al obtener configuración")
+    } finally {
+      setConfigLoading(false)
+    }
+  }
+
+  const fetchTxns = async () => {
+    if (!apiUrl) return // No hacer peticiones sin API URL
+    
+    try {
+      const res = await fetch(`${apiUrl}/transactions`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setTxns(data)
@@ -38,11 +53,19 @@ function App() {
     }
   }
 
+  // Efecto para obtener configuración al inicio
   useEffect(() => {
+    fetchConfig()
+  }, [])
+
+  // Efecto para obtener transacciones una vez que tenemos API URL
+  useEffect(() => {
+    if (!apiUrl) return
+    
     fetchTxns()
     const iv = setInterval(fetchTxns, 3000)
     return () => clearInterval(iv)
-  }, [])
+  }, [apiUrl]) // Se ejecuta cuando apiUrl cambia
 
   const copyToClipboard = async (id) => {
     try {
@@ -68,10 +91,12 @@ function App() {
 
   // Handlers:
   const handleSimulate = async () => {
+    if (!apiUrl) return
+    
     setLoadingSim(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}/simulate?count=${simCount}&interval_ms=${simInterval}`, { method: "POST" })
+      const res = await fetch(`${apiUrl}/simulate?count=${simCount}&interval_ms=${simInterval}`, { method: "POST" })
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.detail || `HTTP ${res.status}`)
@@ -86,10 +111,12 @@ function App() {
   }
 
   const handleSimulateDirect = async () => {
+    if (!apiUrl) return
+    
     setLoadingSim(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}/simulate-direct?count=${simCount}`, { method: "POST" })
+      const res = await fetch(`${apiUrl}/simulate-direct?count=${simCount}`, { method: "POST" })
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.detail || `HTTP ${res.status}`)
@@ -104,11 +131,13 @@ function App() {
   }
 
   const handleClear = async () => {
+    if (!apiUrl) return
+    
     if (!window.confirm("¿Borrar todas las transacciones?")) return
     setLoadingClear(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}/transactions`, { method: "DELETE" })
+      const res = await fetch(`${apiUrl}/transactions`, { method: "DELETE" })
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.detail || `HTTP ${res.status}`)
@@ -121,6 +150,18 @@ function App() {
     } finally {
       setLoadingClear(false)
     }
+  }
+
+  // Mostrar loading mientras se obtiene la config
+  if (configLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando configuración...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
