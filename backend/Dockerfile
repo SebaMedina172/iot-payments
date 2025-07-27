@@ -9,9 +9,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código
 COPY . .
 
-# Exponer puerto
+# Variables de entorno por defecto (se pueden sobrescribir en ACA)
 ENV HOST=0.0.0.0
 ENV PORT=8000
-# Para MQTT_BROKER, se inyecta desde Compose
+ENV USE_SIMULATE_DIRECT=true
+ENV DATABASE_URL=sqlite:///./data/transactions.db
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Crear directorio para la base de datos
+RUN mkdir -p /app/data
+
+# Exponer puerto
+EXPOSE 8000
+
+CMD ["python", "main.py"]

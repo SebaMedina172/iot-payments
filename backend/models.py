@@ -2,18 +2,27 @@ import sqlite3
 import threading
 import time
 
-# Ruta del archivo de base de datos SQLite
-DB_PATH = "transactions.db"
-
 # Lock para asegurar acceso thread-safe a la base de datos
 _lock = threading.Lock()
 
-def init_db():
+# Variable global para almacenar la ruta de la base de datos
+_db_path = None
+
+def init_db(database_url: str = "sqlite:///./transactions.db"):
     """
-    Inicializa la base de datos creando la tabla 'transactions' si no existe
+    Inicializa la base de datos creando la tabla 'transactions' si no existe.
     """
+    global _db_path
+    
+    # Extraer el path del archivo de la URL (para SQLite)
+    if database_url.startswith("sqlite:///"):
+        _db_path = database_url.replace("sqlite:///", "")
+    else:
+        # Si no es SQLite, podríamos agregar soporte para otras bases de datos aquí
+        raise ValueError(f"Tipo de base de datos no soportado: {database_url}")
+    
     with _lock:  # Asegura acceso exclusivo durante la inicialización
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(_db_path)
         cursor = conn.cursor()
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS transactions (
@@ -26,12 +35,21 @@ def init_db():
         conn.commit()
         conn.close()
 
+def _get_db_path():
+    """
+    Retorna la ruta de la base de datos. 
+    Lanza una excepción si la DB no ha sido inicializada.
+    """
+    if _db_path is None:
+        raise RuntimeError("La base de datos debe ser inicializada primero con init_db()")
+    return _db_path
+
 def save_transaction(txn_id: str, amount: float):
     """
     Guarda una nueva transacción en la base de datos con estado 'pending'
     """
     with _lock:  # Protege la operación de escritura
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(_get_db_path())
         cursor = conn.cursor()
         cursor.execute(
             "INSERT OR IGNORE INTO transactions (id, amount, status) VALUES (?, ?, ?)",
@@ -45,7 +63,7 @@ def update_status(txn_id: str, status: str):
     Actualiza el estado de una transacción existente
     """
     with _lock:  # Protege la operación de actualización
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(_get_db_path())
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE transactions SET status = ? WHERE id = ?",
@@ -77,7 +95,7 @@ def list_transactions():
     Obtiene todas las transacciones ordenadas por fecha (más recientes primero)
     """
     with _lock:  # Protege la operación de lectura
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(_get_db_path())
         cursor = conn.cursor()
         # Ordenar por timestamp DESC para mostrar las más recientes primero
         cursor.execute("SELECT id, amount, status, timestamp FROM transactions ORDER BY timestamp DESC")

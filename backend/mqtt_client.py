@@ -1,19 +1,14 @@
-import os, json, time
+import json
+import time
 import paho.mqtt.client as mqtt
+from config import settings
 from models import process_logic_and_update
-
-MQTT_HOST = os.getenv("MQTT_BROKER", "localhost")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-REQUEST_TOPIC = os.getenv("MQTT_TOPIC_REQ", "payments/requests")
-RESPONSE_TOPIC = os.getenv("MQTT_TOPIC_RESP", "payments/responses")
-MAX_RETRIES = 10
-RETRY_DELAY = 2
 
 def when_connected(client, userdata, flags, result_code):
     if result_code == 0:
-        print(f"[MQTT] Conectado a {MQTT_HOST}:{MQTT_PORT}")
-        client.subscribe(REQUEST_TOPIC)
-        print(f"[MQTT] Escuchando en: {REQUEST_TOPIC}")
+        print(f"[MQTT] Conectado a {settings.MQTT_BROKER}:{settings.MQTT_PORT}")
+        client.subscribe(settings.MQTT_TOPIC_REQ)
+        print(f"[MQTT] Escuchando en: {settings.MQTT_TOPIC_REQ}")
     else:
         print(f"[MQTT] Error al conectar, código {result_code}")
 
@@ -23,16 +18,20 @@ def when_message_arrives(client, userdata, message):
     except Exception as error:
         print(f"[MQTT] No pude leer el JSON: {error}")
         return
+    
     transaction_id = data.get("id")
     money_amount = data.get("amount")
+    
     if not transaction_id or money_amount is None:
         print("[MQTT] Mensaje incompleto - falta el ID o el monto")
         return
+    
     print(f"[MQTT] Nueva transacción: {transaction_id} por ${money_amount}")
     final_status = process_logic_and_update(transaction_id, money_amount)
+    
     response_data = {"id": transaction_id, "status": final_status}
-    client.publish(RESPONSE_TOPIC, json.dumps(response_data))
-    print(f"[MQTT] Respuesta enviada a {RESPONSE_TOPIC}: {response_data}")
+    client.publish(settings.MQTT_TOPIC_RESP, json.dumps(response_data))
+    print(f"[MQTT] Respuesta enviada a {settings.MQTT_TOPIC_RESP}: {response_data}")
 
 def run_mqtt_client():
     client = mqtt.Client()
@@ -40,17 +39,17 @@ def run_mqtt_client():
     client.on_message = when_message_arrives
 
     attempt = 0
-    while attempt < MAX_RETRIES:
+    while attempt < settings.MQTT_MAX_RETRIES:
         try:
-            print(f"[MQTT] Intentando conectar a {MQTT_HOST}:{MQTT_PORT} (intento {attempt+1})")
-            client.connect(MQTT_HOST, MQTT_PORT, 60)
+            print(f"[MQTT] Intentando conectar a {settings.MQTT_BROKER}:{settings.MQTT_PORT} (intento {attempt+1})")
+            client.connect(settings.MQTT_BROKER, settings.MQTT_PORT, 60)
             break
         except Exception as e:
             attempt += 1
-            print(f"[MQTT] No se pudo conectar: {e}. Reintentando en {RETRY_DELAY}s...")
-            time.sleep(RETRY_DELAY)
+            print(f"[MQTT] No se pudo conectar: {e}. Reintentando en {settings.MQTT_RETRY_DELAY}s...")
+            time.sleep(settings.MQTT_RETRY_DELAY)
     else:
-        print(f"[MQTT] No se pudo conectar tras {MAX_RETRIES} intentos.")
+        print(f"[MQTT] No se pudo conectar tras {settings.MQTT_MAX_RETRIES} intentos.")
         return None
 
     client.loop_start()

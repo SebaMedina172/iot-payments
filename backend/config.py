@@ -1,0 +1,49 @@
+from pydantic_settings import BaseSettings
+from typing import List, Optional
+
+class Settings(BaseSettings):
+    # Server configuration
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
+    
+    # Feature flags
+    USE_SIMULATE_DIRECT: bool = False
+    
+    # MQTT configuration
+    MQTT_BROKER: str = "localhost"
+    MQTT_PORT: int = 1883
+    MQTT_TOPIC_REQ: str = "payments/requests"
+    MQTT_TOPIC_RESP: str = "payments/responses"
+    MQTT_MAX_RETRIES: int = 10
+    MQTT_RETRY_DELAY: int = 2
+    
+    # Frontend URL for CORS
+    FRONT_URL: Optional[str] = None
+    
+    # Database configuration
+    DATABASE_URL: str = "sqlite:///./transactions.db"
+    
+    # CORS origins (hardcoded ones will be combined with FRONT_URL)
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:3000",  # Frontend contenedorizado en Docker Compose
+        "http://front:80",        # Comunicación interna entre contenedores
+        "https://calm-glacier-0b826dd0f.6.azurestaticapps.net"  # URL publica del front en Azure
+    ]
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
+# Instancia global de configuración
+settings = Settings()
+
+def get_cors_origins() -> List[str]:
+    """
+    Retorna la lista completa de orígenes CORS permitidos,
+    incluyendo FRONT_URL si está configurada.
+    """
+    origins = settings.CORS_ORIGINS.copy()
+    if settings.FRONT_URL:
+        origins.append(settings.FRONT_URL)
+    return origins
