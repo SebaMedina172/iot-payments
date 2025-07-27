@@ -1,6 +1,43 @@
 # Proyecto IoT Payments - Plataforma de Pagos IoT con Azure
 
-## Descripción
+## 🚨 Estado Actual del Proyecto (Actualización 2025)
+
+> **Nota importante**: Este proyecto fue originalmente desplegado en Azure (documentación completa abajo). Debido a limitaciones de suscripción, **el proyecto ha sido migrado exitosamente a una infraestructura alternativa usando servicios gratuitos**, manteniendo toda la funcionalidad original.
+
+### 🔄 Migración Realizada
+
+**Infraestructura Actual (2025):**
+- **Frontend**: Vercel (React + Vite + Tailwind)
+- **Backend**: Render (FastAPI + Python)
+- **Base de Datos**: Supabase PostgreSQL
+- **MQTT Broker**: HiveMQ Cloud
+
+**Demo en Vivo (Nuevo):**
+👉 [Frontend en Vercel](https://iot-payments.vercel.app) | [Backend en Render](https://iot-payments.onrender.com)
+
+### ⚡ Configuración Rápida (Infraestructura Actual)
+
+#### Variables de Entorno - Backend (Render)
+```env
+DATABASE_URL=postgresql://postgres.[ID]:[PASSWORD]@aws-0-eu-north-1.pooler.supabase.com:6543/postgres
+MQTT_BROKER=[TU_CLUSTER_ID].s1.eu.hivemq.cloud
+MQTT_PORT=8883
+MQTT_USERNAME=[TU_USUARIO_HIVEMQ]
+MQTT_PASSWORD=[TU_PASSWORD_HIVEMQ]
+MQTT_TOPIC_REQ=payments/requests
+MQTT_TOPIC_RESP=payments/responses
+FRONTEND_URL=https://iot-payments.vercel.app
+USE_SIMULATE_DIRECT=false
+```
+
+#### Variables de Entorno - Frontend (Vercel)
+```env
+VITE_API_URL=https://iot-payments.onrender.com
+```
+
+---
+
+## Descripción (Documentación Original - Azure)
 Plataforma completa de terminal de pago IoT que procesa transacciones reales a través de Azure IoT Hub, con backend en FastAPI desplegado en Azure App Service con HTTPS nativo, base de datos MySQL gestionada en Azure, y frontend React/Tailwind en Azure Static Web Apps.
 
 ### Características principales:
@@ -30,9 +67,7 @@ Plataforma completa de terminal de pago IoT que procesa transacciones reales a t
 ## 🌐 Demo en Vivo
 
 👉 Puedes probar la aplicación funcionando en el siguiente enlace:  
-[🔗 Ver Demo](https://calm-glacier-0b826dd0f.6.azurestaticapps.net/)  
-
-**Credenciales de demo**: (si aplica autenticación)
+[🔗 Ver Demo](https://iot-payments.vercel.app)  
 
 ---
 
@@ -47,7 +82,7 @@ Plataforma completa de terminal de pago IoT que procesa transacciones reales a t
 8. [Configuración de variables de entorno](#configuración-de-variables-de-entorno)
 9. [Monitorización y logging](#monitorización-y-logging)
 10. [Errores comunes y soluciones](#errores-comunes-y-soluciones)  
-11. [Próximos pasos](#próximos-pasos)  
+11. [Próximos pasos](#próximos-pasos) 
 
 ---
 
