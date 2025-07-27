@@ -26,17 +26,23 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    # Inicializar BD con la URL configurada
-    init_db(settings.DATABASE_URL)
-    print("[STARTUP] Base de datos inicializada.")
-    
-    # Solo iniciar cliente MQTT si no estamos en modo simulación directa
-    if not settings.USE_SIMULATE_DIRECT:
-        client = run_mqtt_client()
-        print("[STARTUP] Cliente MQTT iniciado.")
-    else:
-        print("[STARTUP] Modo simulación directa activado - MQTT deshabilitado.")
-
+    try: 
+        # Inicializar BD con la URL configurada
+        init_db(settings.DATABASE_URL)
+        print("[STARTUP] Base de datos inicializada.")
+        
+        # Solo iniciar cliente MQTT si no estamos en modo simulación directa
+        if not settings.USE_SIMULATE_DIRECT:
+            client = run_mqtt_client()
+            print("[STARTUP] Cliente MQTT iniciado.")
+        else:
+            print("[STARTUP] Modo simulación directa activado - MQTT deshabilitado.")
+    except Exception as e:
+        print(f"[CRITICAL ERROR] Fallo en el evento de inicio: {e}")
+        import traceback
+        traceback.print_exc() 
+        raise 
+        
 @app.get("/transactions")
 async def get_transactions():
     """
@@ -111,14 +117,17 @@ async def simulate_direct(
     Para cuando haga demo en la nube.
     """
     results = []
-    for i in range(count): # Usamos 'i' para generar un device_id único
+    for i in range(count):
         txn_id = str(uuid.uuid4())
         amount = round(random.uniform(10, 200), 2)
-        device_id = f"device-{i+1}" # Generar un device_id simple
-        status = process_logic_and_update(txn_id, amount, device_id) # Pasar device_id
-        results.append({"id": txn_id, "amount": amount, "status": status, "device_id": device_id}) # Incluir device_id en la respuesta
+        device_id = f"device-{i+1}"
+        status = process_logic_and_update(txn_id, amount, device_id)
+        results.append({"id": txn_id, "amount": amount, "status": status, "device_id": device_id})
     
     return {
         "detail": f"Procesadas {count} transacciones directamente", 
         "transactions": results
     }
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=True)
