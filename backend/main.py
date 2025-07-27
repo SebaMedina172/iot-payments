@@ -15,6 +15,9 @@ import paho.mqtt.client as mqtt
 
 app = FastAPI()
 
+# Variable global para el cliente MQTT
+mqtt_publisher_client = None
+
 # Configuración de CORS usando la configuración centralizada
 app.add_middleware(
     CORSMiddleware,
@@ -26,23 +29,33 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    try: 
+    global mqtt_publisher_client
+    try:
         # Inicializar BD con la URL configurada
         init_db(settings.DATABASE_URL)
         print("[STARTUP] Base de datos inicializada.")
         
         # Solo iniciar cliente MQTT si no estamos en modo simulación directa
         if not settings.USE_SIMULATE_DIRECT:
-            client = run_mqtt_client()
+            mqtt_publisher_client = run_mqtt_client()
             print("[STARTUP] Cliente MQTT iniciado.")
         else:
             print("[STARTUP] Modo simulación directa activado - MQTT deshabilitado.")
     except Exception as e:
         print(f"[CRITICAL ERROR] Fallo en el evento de inicio: {e}")
         import traceback
-        traceback.print_exc() 
-        raise 
-        
+        traceback.print_exc()
+        raise
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    global mqtt_publisher_client
+    if mqtt_publisher_client:
+        print("[SHUTDOWN] Deteniendo loop del cliente MQTT y desconectando.")
+        mqtt_publisher_client.loop_stop()
+        mqtt_publisher_client.disconnect()
+        print("[SHUTDOWN] Cliente MQTT desconectado.")
+
 @app.get("/transactions")
 async def get_transactions():
     """
@@ -78,21 +91,21 @@ async def simulate_transactions(
     Simula 'count' transacciones publicándolas en el broker MQTT, con un intervalo en ms entre ellas.
     Se ejecuta en background para no bloquear la respuesta.
     """
+    global mqtt_publisher_client
+    if not mqtt_publisher_client:
+        raise HTTPException(status_code=500, detail="Cliente MQTT no inicializado. Asegúrate de que USE_SIMULATE_DIRECT no esté activado.")
+
     def _publish_loop(count: int, interval_ms: int):
-        client = mqtt.Client()
-        try:
-            client.connect(settings.MQTT_BROKER, settings.MQTT_PORT, 60)
-        except Exception as e:
-            print(f"[simulate] Error conectando MQTT: {e}")
-            return
+        global mqtt_publisher_client
         
         for _ in range(count):
             txn = {
                 "id": str(uuid.uuid4()), 
-                "amount": round(random.uniform(10, 200), 2)
+                "amount": round(random.uniform(10, 200), 2),
+                "device_id": f"simulated_device_{random.randint(1, 10)}"
             }
             try:
-                client.publish(settings.MQTT_TOPIC_REQ, json.dumps(txn))
+                mqtt_publisher_client.publish(settings.MQTT_TOPIC_REQ, json.dumps(txn))
                 print(f"[simulate] Publicado: {txn}")
             except Exception as e:
                 print(f"[simulate] Error publicando: {e}")
@@ -100,8 +113,6 @@ async def simulate_transactions(
             if interval_ms > 0:
                 time.sleep(interval_ms / 1000.0)
         
-        client.disconnect()
-
     background_tasks.add_task(_publish_loop, count, interval_ms)
     return JSONResponse(
         content={"detail": f"Simulación iniciada: {count} transacciones"}, 
