@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     MQTT_TOPIC_RESP: str = "payments/responses"
     MQTT_MAX_RETRIES: int = 10
     MQTT_RETRY_DELAY: int = 2
+    MQTT_USERNAME: Optional[str] = None 
+    MQTT_PASSWORD: Optional[str] = None 
     
     # Frontend URL for CORS
     FRONTEND_URL: Optional[str] = None
