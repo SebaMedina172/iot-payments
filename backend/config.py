@@ -18,12 +18,12 @@ class Settings(BaseSettings):
     MQTT_RETRY_DELAY: int = 2
     
     # Frontend URL for CORS
-    FRONT_URL: Optional[str] = None
+    FRONTEND_URL: Optional[str] = None
     
     # Database configuration
-    DATABASE_URL: str = "sqlite:///./transactions.db"
+    DATABASE_URL: str
     
-    # CORS origins (hardcoded ones will be combined with FRONT_URL)
+    # CORS origins (hardcoded ones will be combined with FRONTEND_URL)
     CORS_ORIGINS: List[str] = [
         "http://localhost:5173",  # Vite dev server
         "http://localhost:3000",  # Frontend contenedorizado en Docker Compose
@@ -41,9 +41,9 @@ settings = Settings()
 def get_cors_origins() -> List[str]:
     """
     Retorna la lista completa de orígenes CORS permitidos,
-    incluyendo FRONT_URL si está configurada.
+    incluyendo FRONTEND_URL si está configurada.
     """
     origins = settings.CORS_ORIGINS.copy()
-    if settings.FRONT_URL:
-        origins.append(settings.FRONT_URL)
+    if settings.FRONTEND_URL:
+        origins.append(settings.FRONTEND_URL)
     return origins

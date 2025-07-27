@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from config import settings, get_cors_origins
-from models import init_db, list_transactions, process_logic_and_update
+from models import init_db, list_transactions, process_logic_and_update, _get_db_connection # Importa _get_db_connection
 from mqtt_client import run_mqtt_client
 
 import uuid
@@ -47,21 +47,20 @@ async def get_transactions():
 @app.delete("/transactions")
 async def delete_transactions():
     """
-    Borra todas las transacciones (elimina el archivo SQLite y recrea la tabla vacía).
+    Borra todas las transacciones de la tabla PostgreSQL.
     """
+    conn = None
     try:
-        # Extraer el path del archivo de la URL de la base de datos
-        # Para SQLite, settings.DATABASE_URL es algo como "sqlite:///./transactions.db"
-        db_path = settings.DATABASE_URL.replace("sqlite:///", "")
-        
-        import os
-        if os.path.exists(db_path):
-            os.remove(db_path)
-        
-        init_db(settings.DATABASE_URL)
+        conn = _get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("TRUNCATE TABLE public.transactions RESTART IDENTITY;")
+        conn.commit()
         return JSONResponse(content={"detail": "Transacciones borradas"}, status_code=200)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error borrando transacciones: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 @app.post("/simulate")
 async def simulate_transactions(

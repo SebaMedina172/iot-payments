@@ -1,5 +1,5 @@
 fastapi
 uvicorn[standard]
 paho-mqtt
-pydantic[dotenv]==2.5.2
-pydantic-settings
+pydantic-settings==2.0.3
+psycopg2-binary

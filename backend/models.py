@@ -1,76 +1,100 @@
-import sqlite3
+import psycopg2
 import threading
 import time
+import uuid
 
 # Lock para asegurar acceso thread-safe a la base de datos
 _lock = threading.Lock()
 
-# Variable global para almacenar la ruta de la base de datos
-_db_path = None
+# Variable global para almacenar la cadena de conexión
+_db_url = None
 
-def init_db(database_url: str = "sqlite:///./transactions.db"):
+def init_db(database_url: str):
     """
     Inicializa la base de datos creando la tabla 'transactions' si no existe.
     """
-    global _db_path
+    global _db_url
+    _db_url = database_url
     
-    # Extraer el path del archivo de la URL (para SQLite)
-    if database_url.startswith("sqlite:///"):
-        _db_path = database_url.replace("sqlite:///", "")
-    else:
-        # Si no es SQLite, podríamos agregar soporte para otras bases de datos aquí
-        raise ValueError(f"Tipo de base de datos no soportado: {database_url}")
-    
-    with _lock:  # Asegura acceso exclusivo durante la inicialización
-        conn = sqlite3.connect(_db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS transactions (
-            id TEXT PRIMARY KEY,
-            amount REAL,
-            status TEXT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-        """)
-        conn.commit()
-        conn.close()
+    with _lock:
+        conn = None
+        try:
+            conn = psycopg2.connect(_db_url)
+            cursor = conn.cursor()
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS public.transactions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                device_id TEXT NOT NULL,
+                amount NUMERIC(10, 2) NOT NULL,
+                status TEXT NOT NULL,
+                timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                location TEXT
+            );
+            """)
+            conn.commit()
+            print("[DB] Tabla 'transactions' verificada/creada.")
+        except Exception as e:
+            print(f"[DB ERROR] No se pudo inicializar la base de datos: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
 
-def _get_db_path():
+def _get_db_connection():
     """
-    Retorna la ruta de la base de datos. 
+    Retorna una nueva conexión a la base de datos.
     Lanza una excepción si la DB no ha sido inicializada.
     """
-    if _db_path is None:
+    if _db_url is None:
         raise RuntimeError("La base de datos debe ser inicializada primero con init_db()")
-    return _db_path
+    return psycopg2.connect(_db_url)
 
 def save_transaction(txn_id: str, amount: float):
     """
     Guarda una nueva transacción en la base de datos con estado 'pending'
     """
-    with _lock:  # Protege la operación de escritura
-        conn = sqlite3.connect(_get_db_path())
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT OR IGNORE INTO transactions (id, amount, status) VALUES (?, ?, ?)",
-            (txn_id, amount, "pending")
-        )
-        conn.commit()
-        conn.close()
+    with _lock:
+        conn = None
+        try:
+            conn = _get_db_connection()
+            cursor = conn.cursor()
+            # Usamos INSERT INTO ... ON CONFLICT DO NOTHING para evitar duplicados por ID
+            cursor.execute(
+                """
+                INSERT INTO public.transactions (id, amount, status) 
+                VALUES (%s, %s, %s)
+                ON CONFLICT (id) DO NOTHING
+                """,
+                (txn_id, amount, "pending")
+            )
+            conn.commit()
+        except Exception as e:
+            print(f"[DB ERROR] No se pudo guardar la transacción {txn_id}: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
 
 def update_status(txn_id: str, status: str):
     """
     Actualiza el estado de una transacción existente
     """
-    with _lock:  # Protege la operación de actualización
-        conn = sqlite3.connect(_get_db_path())
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE transactions SET status = ? WHERE id = ?",
-            (status, txn_id)
-        )
-        conn.commit()
-        conn.close()
+    with _lock:
+        conn = None
+        try:
+            conn = _get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE public.transactions SET status = %s WHERE id = %s",
+                (status, txn_id)
+            )
+            conn.commit()
+        except Exception as e:
+            print(f"[DB ERROR] No se pudo actualizar el estado de {txn_id}: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
 
 def process_logic_and_update(txn_id: str, amount: float) -> str:
     """
@@ -94,22 +118,29 @@ def list_transactions():
     """
     Obtiene todas las transacciones ordenadas por fecha (más recientes primero)
     """
-    with _lock:  # Protege la operación de lectura
-        conn = sqlite3.connect(_get_db_path())
-        cursor = conn.cursor()
-        # Ordenar por timestamp DESC para mostrar las más recientes primero
-        cursor.execute("SELECT id, amount, status, timestamp FROM transactions ORDER BY timestamp DESC")
-        rows = cursor.fetchall()
-        conn.close()
+    with _lock:
+        conn = None
+        try:
+            conn = _get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, amount, status, timestamp, location FROM public.transactions ORDER BY timestamp DESC")
+            rows = cursor.fetchall()
+        except Exception as e:
+            print(f"[DB ERROR] No se pudieron listar las transacciones: {e}")
+            raise
+        finally:
+            if conn:
+                conn.close()
     
-    # Convertir tuplas de SQLite a diccionarios para facilitar el uso
+    # Convertir tuplas a diccionarios para facilitar el uso
     result = []
     for r in rows:
         result.append({
-            "id": r[0],
-            "amount": r[1],
+            "id": str(r[0]), # Convertir UUID a string
+            "amount": float(r[1]), # Convertir Decimal a float
             "status": r[2],
-            "timestamp": r[3]
+            "timestamp": r[3].isoformat(), # Convertir datetime a string ISO
+            "location": r[4]
         })
     
     return result
