@@ -2,13 +2,7 @@
 
 import { useEffect, useState } from "react"
 
-// const API_URL = import.meta.env.VITE_API_URL
-
-// Solución temporal: hardcodear la API URL
-const API_URL = "https://backend-iot-demo.politebeach-3b4e4b93.eastus.azurecontainerapps.io"
-
-console.log("API_URL:", API_URL) // Debug temporal
-console.log("All env vars:", import.meta.env) // Debug temporal
+const API_URL = import.meta.env.VITE_API_URL
 
 function App() {
   const [txns, setTxns] = useState([])
