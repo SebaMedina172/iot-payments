@@ -28,7 +28,7 @@ class Settings(BaseSettings):
         "http://localhost:5173",  # Vite dev server
         "http://localhost:3000",  # Frontend contenedorizado en Docker Compose
         "http://front:80",        # Comunicación interna entre contenedores
-        "https://calm-glacier-0b826dd0f.6.azurestaticapps.net"  # URL publica del front en Azure
+        "https://iot-payments.vercel.app/"  # URL publica del front en Vercel
     ]
 
     class Config:
