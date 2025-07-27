@@ -22,12 +22,14 @@ def when_message_arrives(client, userdata, message):
     transaction_id = data.get("id")
     money_amount = data.get("amount")
     
+    device_id = data.get("device_id", "unknown_device") # Añadir un valor por defecto si no viene device_id
+    
     if not transaction_id or money_amount is None:
         print("[MQTT] Mensaje incompleto - falta el ID o el monto")
         return
     
-    print(f"[MQTT] Nueva transacción: {transaction_id} por ${money_amount}")
-    final_status = process_logic_and_update(transaction_id, money_amount)
+    print(f"[MQTT] Nueva transacción: {transaction_id} por ${money_amount} de {device_id}")
+    final_status = process_logic_and_update(transaction_id, money_amount, device_id) # Pasar device_id
     
     response_data = {"id": transaction_id, "status": final_status}
     client.publish(settings.MQTT_TOPIC_RESP, json.dumps(response_data))
@@ -37,6 +39,10 @@ def run_mqtt_client():
     client = mqtt.Client()
     client.on_connect = when_connected
     client.on_message = when_message_arrives
+
+    # Configurar credenciales y TLS/SSL para HiveMQ Cloud
+    client.username_pw_set(settings.MQTT_USERNAME, settings.MQTT_PASSWORD) # Credenciales
+    client.tls_set() # Habilitar TLS/SSL
 
     attempt = 0
     while attempt < settings.MQTT_MAX_RETRIES:
