@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from config import settings, get_cors_origins
-from models import init_db, list_transactions, process_logic_and_update, _get_db_connection # Importa _get_db_connection
+from models import init_db, list_transactions, process_logic_and_update, _get_db_connection
 from mqtt_client import run_mqtt_client
 
 import uuid
@@ -111,16 +111,14 @@ async def simulate_direct(
     Para cuando haga demo en la nube.
     """
     results = []
-    for _ in range(count):
+    for i in range(count): # Usamos 'i' para generar un device_id único
         txn_id = str(uuid.uuid4())
         amount = round(random.uniform(10, 200), 2)
-        status = process_logic_and_update(txn_id, amount)
-        results.append({"id": txn_id, "amount": amount, "status": status})
+        device_id = f"device-{i+1}" # Generar un device_id simple
+        status = process_logic_and_update(txn_id, amount, device_id) # Pasar device_id
+        results.append({"id": txn_id, "amount": amount, "status": status, "device_id": device_id}) # Incluir device_id en la respuesta
     
     return {
         "detail": f"Procesadas {count} transacciones directamente", 
         "transactions": results
     }
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=True)

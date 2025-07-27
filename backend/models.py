@@ -1,9 +1,10 @@
 import psycopg2
 import threading
 import time
-import uuid
+import uuid # Necesario para generar UUIDs si no usas SERIAL
 
 # Lock para asegurar acceso thread-safe a la base de datos
+# Aunque psycopg2 es thread-safe, el lock puede ser útil para operaciones de conexión/desconexión
 _lock = threading.Lock()
 
 # Variable global para almacenar la cadena de conexión
@@ -49,7 +50,7 @@ def _get_db_connection():
         raise RuntimeError("La base de datos debe ser inicializada primero con init_db()")
     return psycopg2.connect(_db_url)
 
-def save_transaction(txn_id: str, amount: float):
+def save_transaction(txn_id: str, amount: float, device_id: str): # Añadir device_id
     """
     Guarda una nueva transacción en la base de datos con estado 'pending'
     """
@@ -58,14 +59,14 @@ def save_transaction(txn_id: str, amount: float):
         try:
             conn = _get_db_connection()
             cursor = conn.cursor()
-            # Usamos INSERT INTO ... ON CONFLICT DO NOTHING para evitar duplicados por ID
+            # Incluir device_id en el INSERT
             cursor.execute(
                 """
-                INSERT INTO public.transactions (id, amount, status) 
-                VALUES (%s, %s, %s)
+                INSERT INTO public.transactions (id, amount, status, device_id) 
+                VALUES (%s, %s, %s, %s)
                 ON CONFLICT (id) DO NOTHING
                 """,
-                (txn_id, amount, "pending")
+                (txn_id, amount, "pending", device_id) # Pasar device_id aquí
             )
             conn.commit()
         except Exception as e:
@@ -96,12 +97,12 @@ def update_status(txn_id: str, status: str):
             if conn:
                 conn.close()
 
-def process_logic_and_update(txn_id: str, amount: float) -> str:
+def process_logic_and_update(txn_id: str, amount: float, device_id: str) -> str: # Añadir device_id
     """
     Procesa una transacción aplicando lógica y actualizando su estado
     """
     # Paso 1: Guardar transacción como 'pending'
-    save_transaction(txn_id, amount)
+    save_transaction(txn_id, amount, device_id) # Pasar device_id aquí
     
     # Paso 2: Simular tiempo de procesamiento
     time.sleep(0.2)
@@ -123,7 +124,7 @@ def list_transactions():
         try:
             conn = _get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT id, amount, status, timestamp, location FROM public.transactions ORDER BY timestamp DESC")
+            cursor.execute("SELECT id, amount, status, timestamp, location, device_id FROM public.transactions ORDER BY timestamp DESC") # Añadir device_id a la selección
             rows = cursor.fetchall()
         except Exception as e:
             print(f"[DB ERROR] No se pudieron listar las transacciones: {e}")
@@ -136,11 +137,12 @@ def list_transactions():
     result = []
     for r in rows:
         result.append({
-            "id": str(r[0]), # Convertir UUID a string
-            "amount": float(r[1]), # Convertir Decimal a float
+            "id": str(r[0]),
+            "amount": float(r[1]),
             "status": r[2],
-            "timestamp": r[3].isoformat(), # Convertir datetime a string ISO
-            "location": r[4]
+            "timestamp": r[3].isoformat(),
+            "location": r[4],
+            "device_id": r[5] # Añadir device_id al diccionario de resultado
         })
     
     return result
