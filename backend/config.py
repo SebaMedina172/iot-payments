@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # MQTT configuration
     MQTT_BROKER: str = "localhost"
-    MQTT_PORT: int = 1883
+    MQTT_PORT: int = 8883 
     MQTT_TOPIC_REQ: str = "payments/requests"
     MQTT_TOPIC_RESP: str = "payments/responses"
     MQTT_MAX_RETRIES: int = 10
