@@ -63,6 +63,46 @@ async def get_transactions():
     """
     return list_transactions()
 
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint para mantener el servicio activo.
+    También hace una query simple a la base de datos para mantener Supabase activo.
+    """
+    try:
+        # Hacer una query simple a la base de datos para mantenerla activa
+        conn = _get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1;")  # Query simple
+        cursor.close()
+        conn.close()
+        
+        return JSONResponse(
+            content={
+                "status": "healthy",
+                "database": "connected",
+                "timestamp": time.time()
+            }, 
+            status_code=200
+        )
+    except Exception as e:
+        return JSONResponse(
+            content={
+                "status": "unhealthy",
+                "database": "error",
+                "error": str(e),
+                "timestamp": time.time()
+            }, 
+            status_code=503
+        )
+
+@app.get("/")
+async def root():
+    """
+    Root endpoint para verificar que el servicio está corriendo.
+    """
+    return {"message": "GreenAdvice API is running", "status": "ok"}
+
 @app.delete("/transactions")
 async def delete_transactions():
     """

@@ -1,0 +1,39 @@
+name: Keep Alive Service
+
+on:
+  schedule:
+    # Ejecutar cada 10 minutos (Render se duerme después de 15 min de inactividad)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Permite ejecutar manualmente desde GitHub
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Backend Health Check
+        run: |
+          echo "🏓 Haciendo ping al backend..."
+          
+          # Reemplaza con tu URL de Render
+          BACKEND_URL="${{ secrets.BACKEND_URL }}"
+          
+          if [ -z "$BACKEND_URL" ]; then
+            echo "⚠️  BACKEND_URL no está configurado en los secrets"
+            exit 1
+          fi
+          
+          # Hacer request al health check
+          response=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health")
+          
+          if [ $response -eq 200 ]; then
+            echo "✅ Backend está activo (Status: $response)"
+          else
+            echo "⚠️  Backend respondió con status: $response"
+            # No falla el job para que siga intentando en el próximo cron
+          fi
+          
+      - name: Log Activity
+        run: |
+          echo "📊 Keep-alive ejecutado exitosamente"
+          echo "🕒 Timestamp: $(date)"
